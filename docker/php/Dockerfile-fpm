@@ -1,0 +1,55 @@
+FROM php:7.3-fpm
+
+RUN apt-get update && apt-get install -y \
+        libfreetype6-dev \
+    	libjpeg62-turbo-dev \
+    	libpng-dev \
+    	git \
+    	libzip-dev \
+        zip \
+        unzip \
+        libc-bin \
+        libaio-dev \
+	&& docker-php-ext-install -j$(nproc) iconv \
+	&& docker-php-ext-configure gd --with-freetype-dir=/usr/include/ --with-jpeg-dir=/usr/include/ \
+    && docker-php-ext-install -j$(nproc) gd \
+    && docker-php-ext-install -j$(nproc) bcmath \
+    && docker-php-ext-configure zip --with-libzip \
+    && docker-php-ext-install zip
+
+# ************** pdo_pgsql **************
+
+RUN apt-get install -y libpq-dev \
+    && docker-php-ext-configure pgsql --with-pgsql=/usr/local/pgsql \
+    && docker-php-ext-install pdo_pgsql
+
+# ************** ldap **************
+
+RUN apt-get install \
+    libldap2-dev -y \
+    && docker-php-ext-configure ldap --with-libdir=lib/x86_64-linux-gnu \
+    && docker-php-ext-install ldap
+
+# ************** XDebug **************
+
+RUN yes | pecl install xdebug-2.7.2 \
+    && docker-php-ext-enable xdebug \
+    && echo "max_execution_time=1800" > $PHP_INI_DIR/conf.d/app_custom.ini
+
+# ************** Oracle OCI extension **************
+
+# https://github.com/FabriZZio/docker-php-oci8/blob/master/Dockerfile
+
+ADD oracle/instantclient-basiclite-linux.x64-19.3.0.0.0dbru.zip /tmp/instantclient-basiclite-linux.x64-19.3.0.0.0dbru.zip
+ADD oracle/instantclient-sdk-linux.x64-19.3.0.0.0dbru.zip /tmp/instantclient-sdk-linux.x64-19.3.0.0.0dbru.zip
+
+RUN unzip /tmp/instantclient-basiclite-linux.x64-19.3.0.0.0dbru.zip -d /usr/local \
+    && unzip /tmp/instantclient-sdk-linux.x64-19.3.0.0.0dbru.zip -d /usr/local \
+    && ln -s /usr/local/instantclient_19_3 /usr/local/instantclient
+
+ENV LD_LIBRARY_PATH /usr/local/instantclient
+ENV ORACLE_HOME /usr/local/instantclient
+
+RUN echo 'instantclient,/usr/local/instantclient' | pecl install oci8 \
+    && echo "extension=oci8.so" > $PHP_INI_DIR/conf.d/oci8.ini
+

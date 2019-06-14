@@ -1,0 +1,59 @@
+version: "3"
+
+services:
+
+  nginx:
+    build:
+      context: docker/nginx
+    ports:
+      - "${APP_HTTP_PORT}:80"
+    volumes:
+      - ../src:/app
+    tty: true
+    networks:
+      - app
+
+  php_fpm:
+    build:
+      context: docker/php
+      dockerfile: Dockerfile-fpm
+    volumes:
+      - ../src:/app
+    environment:
+      PHP_IDE_CONFIG: "serverName=${COMPOSE_PROJECT_NAME}"
+      XDEBUG_CONFIG: "remote_enable=on remote_autostart=off remote_host=${APP_DEBUG_HOST}"
+    tty: true
+    networks:
+      - app
+
+  php_cli:
+    build:
+      context: docker/php
+      dockerfile: Dockerfile
+    volumes:
+      - ../src:/app
+    environment:
+      PHP_IDE_CONFIG: "serverName=${COMPOSE_PROJECT_NAME}"
+      XDEBUG_CONFIG: "remote_enable=on remote_autostart=off remote_host=${APP_DEBUG_HOST}"
+    tty: true
+    networks:
+      - app
+
+  postgres:
+    image: postgres:11.3-alpine
+    ports:
+      - "${APP_DB_EXT_PORT}:5432"
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE}
+    networks:
+      - app
+
+networks:
+  app:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: ${APP_NETWORK}
